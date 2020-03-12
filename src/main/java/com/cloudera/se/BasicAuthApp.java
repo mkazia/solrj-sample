@@ -3,6 +3,9 @@ package com.cloudera.se;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
+import org.apache.http.config.Lookup;
+import org.apache.http.config.RegistryBuilder;
+import org.apache.http.cookie.CookieSpecProvider;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
@@ -38,13 +41,20 @@ public class BasicAuthApp
 
         //System.setProperty("java.security.auth.login.config", jaasConf);
 
+        HttpClientUtil.setCookiePolicy(SolrPortAwareCookieSpecFactory.POLICY_NAME);
         HttpClientUtil.getHttpClientBuilder()
                 .setDefaultCredentialsProvider(() -> {
-                        CredentialsProvider credsProvider = new BasicCredentialsProvider();
-                        credsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
-                        return credsProvider;
-                    }
-                );
+                    CredentialsProvider credsProvider = new BasicCredentialsProvider();
+                    credsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, password));
+                    return credsProvider;
+                })
+                .setCookieSpecRegistryProvider(() -> {
+                    SolrPortAwareCookieSpecFactory cookieFactory = new SolrPortAwareCookieSpecFactory();
+                    Lookup<CookieSpecProvider> cookieRegistry = RegistryBuilder.<CookieSpecProvider> create()
+                            .register(SolrPortAwareCookieSpecFactory.POLICY_NAME, cookieFactory).build();
+
+                    return cookieRegistry;
+                });
 
         CloudSolrClient client = new CloudSolrClient.Builder(zkList, Optional.of(zkRoot)).build();
 
